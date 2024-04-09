@@ -1,6 +1,7 @@
 Hálózati anomáliák detektálása entrópiával, tömörítés segítségével
 
 Források:
+
 https://www.kernel.org/doc/html/next/bpf/ringbuf.html 
 
 https://www.man7.org/linux/man-pages/man7/bpf-helpers.7.html
