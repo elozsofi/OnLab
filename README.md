@@ -2,6 +2,10 @@ Hálózati anomáliák detektálása entrópiával, tömörítés segítségéve
 
 Források:
 
+https://github.com/facebook/zstd
+
+https://linux.die.net/man/3/clock_gettime
+
 https://www.kernel.org/doc/html/next/bpf/ringbuf.html 
 
 https://www.man7.org/linux/man-pages/man7/bpf-helpers.7.html
