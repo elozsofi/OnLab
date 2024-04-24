@@ -11,3 +11,5 @@ https://ebpf.io/what-is-ebpf/
 https://github.com/anakryiko/bpf-ringbuf-examples
 
 https://gist.github.com/idlecool/1248824#file-gistfile1-txt
+
+https://raspberry-projects.com/pi/programming-in-c/memory/shared-memory
