@@ -7,6 +7,22 @@
 #include <dirent.h>
 
 #define MAX_FILE_NAME 256
+
+// IPC shared memory
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <semaphore.h>
+#define SHM_NAME "/packet_shm"
+#define SHM_SIZE 4*1024*1024 // shared buffer size is 4MB
+#define SEM_EMPTY_NAME "/sem_empty"
+#define SEM_FULL_NAME "/sem_full"
+
+void *shared_memory;
+sem_t *empty, *full;
+
 static void compress_orDie(void* data, size_t dataSize, void** compressedData, size_t* compressedSize, const size_t maxBufferSize);
 size_t loadFile_orDie(const char* fileName, void* buffer, size_t bufferSize);
 
@@ -17,6 +33,45 @@ typedef struct Packet{
     double compress_rate;
 }Packet;
 
+void init_shared_memory() {
+    int fd = shm_open(SHM_NAME, O_RDONLY, 0666);
+    shared_memory = mmap(0, SHM_SIZE, PROT_READ, MAP_SHARED, fd, 0);
+    
+    //close(fd);
+
+    empty = sem_open(SEM_EMPTY_NAME, 0);
+    full = sem_open(SEM_FULL_NAME, 0);
+}
+
+void compress_and_report() {
+    int counter = 1;
+    while(1){
+        sem_wait(full);
+
+        // timestamps for compression runtime
+        struct timespec start, end;
+        unsigned long long tsm1, tsm2;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        tsm1 = start.tv_sec * 1000000000L + start.tv_nsec;
+
+        void *compressedData = NULL;
+        size_t compressedSize = 0;
+        compress_orDie(shared_memory, SHM_SIZE, &compressedData, &compressedSize, SHM_SIZE);
+
+
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        tsm2 = end.tv_sec * 1000000000L + end.tv_nsec;
+        float deltaTime = (float)(tsm2-tsm1);
+        deltaTime *= 0.000001;
+
+        float compressionRate = compressedSize/SHM_SIZE*100;
+        printf("%d Before: %zu\tAfter: %zu\tCompression rate: %f\tRuntime: %.2fms\n", counter++, SHM_SIZE, compressedSize, compressionRate, deltaTime);
+        
+        free(compressedData);
+        sem_post(empty);
+    }
+}
+/*
 // get list of .pcap files in the curr directory
 // used in loadInfo to get pcap files faster, make loading simpler
 int getPcapFiles(char fileList[][MAX_FILE_NAME], int maxFiles) {
@@ -96,7 +151,7 @@ Packet* getInfoFromKernel(const size_t maxBufferSize){
     free(fileBuffer);
     return packetList;
 }
-
+*/
 
 // needed for ACL rule: ip address + rate limit (defined as num of packets / second)
 // num of packets as an unsigned long long
@@ -132,9 +187,10 @@ static void compress_orDie(void* data, size_t dataSize, void** compressedData, s
 int main(int argc, const char** argv)
 {
     // maximum input buffer size is 8MB
-    const size_t maxBufferSize = 8 * 1024 * 1024;
-
-    Packet* p = getInfoFromKernel(maxBufferSize);
+    //const size_t maxBufferSize = 8 * 1024 * 1024;
+    //Packet* p = getInfoFromKernel(maxBufferSize);
     
+    init_shared_memory();
+    compress_and_report();
     return 0;
 }
