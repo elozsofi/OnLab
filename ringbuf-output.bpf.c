@@ -3,12 +3,11 @@
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include "common.h"
-#include<linux/if_packet.h>
-#include<linux/if_ether.h>
-#include <linux/ip.h>  // For IPv4 header
+#include <linux/if_packet.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
 #include <linux/pkt_cls.h>  // For TC
-
-//#define PIN_GLOBAL_NS		2
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -19,40 +18,22 @@ struct {
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 } rb SEC(".maps");
 
-// struct for captured packet data
-/*struct packet_info {
-  __u32 src_ip;
-  __u32 payload_size;
-};*/
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key,int);  // key is packet number
+	__type(value, struct packet); //value is packet
+} heap SEC(".maps");
 
-/*struct bpf_elf_map snoop_packets SEC("maps") = {
-    .type           = BPF_MAP_TYPE_HASH,
-    .size_key       = sizeof(int),
-    .size_value     = sizeof(struct packet_info),
-    .pinning        = PIN_GLOBAL_NS,
-    .max_elem       = PIN_GLOBAL_NS,
-};*/
-
-// xdp-re áttérni
-// SEC("xdp")
-// value a struktúra, key a csomagszám
-
-//__u32 buff_array[512/4];
-
+/* packet data*/
+struct packet {
+	int ip;
+	//char payload[65*1024]; /*maximum TCP packet size is 65535kB*/
+	int prot;
+};
 
 SEC("ingress")
 int capture_packets(struct __sk_buff *skb) {
-
-	struct ethhdr *eth;
-	struct udphdr *udp;
-
-    // Initialize packet data.
-    void *data = (void *)(long)skb->data;
-    void *data_end = (void *)(long)skb->data_end;
-	unsigned long long len = data_end - data;
-
-	// valid packet length
-	if (len <= 0) return TC_ACT_OK;
 
 	void* rb_data = bpf_ringbuf_reserve(&rb, 512, 0);
 
@@ -60,21 +41,46 @@ int capture_packets(struct __sk_buff *skb) {
 		return TC_ACT_OK;
 	}
 	else{
-		//unsigned long long length = (len<512) ? len:512;
 		
 		int ret = bpf_skb_load_bytes(skb,0,rb_data,512);
 
-		if (ret >= 0){
-			bpf_ringbuf_submit(rb_data,0);
-		}
-		else{
-			bpf_ringbuf_discard(rb_data, 0);
-		}
-		//memcpy(rb_data, buff_array);
+		if(ret < 0) { bpf_ringbuf_discard(rb_data,0); }
+		else {
+
+			struct packet *e;
+			struct ethhdr *eth;
+			struct iphdr *iph;
+			int zero = 0;
+			__u64 nh_off = sizeof(struct ethhdr);
+
+			// invalid packet size
+			if((skb->data + nh_off + sizeof(struct iphdr)) > skb->data_end) return TC_ACT_OK;
+
+			e = bpf_map_lookup_elem(&heap, &zero);
+			if (!e) return TC_ACT_OK;
+
+			// parse headers
+			eth = (struct ethhdr *)skb->data;
+			iph = (struct iphdr *)(skb->data + nh_off);
+
+			e->ip = iph->saddr;
+			
+			if(iph->protocol == 1){
+				// icmp
+				e->prot = 1;
+			}
+			if(iph->protocol == 6){
+				// tcp
+				e->prot = 6;
+			}
+			if(iph->protocol == 17){
+				// udp
+				e->prot = 17;
+			}
+
+			bpf_ringbuf_submit(e,0);
 		
-		//bpf_ringbuf_output(&rb, data, sizeof(*data), 0);
+		}
 	}
-
-
     return TC_ACT_OK;
 }
