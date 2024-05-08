@@ -25,61 +25,67 @@ struct {
 	__type(value, struct packet); //value is packet
 } heap SEC(".maps");
 
-/* packet data*/
-struct packet {
-	int ip;
-	//char payload[65*1024]; /*maximum TCP packet size is 65535kB*/
-	int prot;
-};
-
 SEC("ingress")
 int capture_packets(struct __sk_buff *skb) {
 
-	void* rb_data = bpf_ringbuf_reserve(&rb, 512, 0);
+	void* rb_data = bpf_ringbuf_reserve(&rb, sizeof(struct packet*), 0);
 
 	if (!rb_data){
 		return TC_ACT_OK;
 	}
 	else{
 		
-		int ret = bpf_skb_load_bytes(skb,0,rb_data,512);
+		int ret = bpf_skb_load_bytes(skb,0,rb_data,sizeof(struct packet*));
 
 		if(ret < 0) { bpf_ringbuf_discard(rb_data,0); }
 		else {
-
-			struct packet *e;
+			struct packet *pkt;
+			pkt->payload = skb->data;
+			pkt = (struct packet *)rb_data;
 			struct ethhdr *eth;
-			struct iphdr *iph;
 			int zero = 0;
 			__u64 nh_off = sizeof(struct ethhdr);
 
+			if ( (skb->data + nh_off + 4) > skb->data_end) 
+				return 0;
+
 			// invalid packet size
-			if((skb->data + nh_off + sizeof(struct iphdr)) > skb->data_end) return TC_ACT_OK;
-
-			e = bpf_map_lookup_elem(&heap, &zero);
-			if (!e) return TC_ACT_OK;
-
-			// parse headers
-			eth = (struct ethhdr *)skb->data;
-			iph = (struct iphdr *)(skb->data + nh_off);
-
-			e->ip = iph->saddr;
-			
-			if(iph->protocol == 1){
-				// icmp
-				e->prot = 1;
+			if((skb->data + nh_off + sizeof(struct iphdr)) > skb->data_end){
+				return TC_ACT_OK;
 			}
-			if(iph->protocol == 6){
-				// tcp
-				e->prot = 6;
-			}
-			if(iph->protocol == 17){
-				// udp
-				e->prot = 17;
-			}
+			else{
+				// parse headers
+				eth = (struct ethhdr *)skb->data;
+				__u16 h_proto = eth->h_proto;
+				if(h_proto == (ETH_P_IP)){
+					struct iphdr *iph = skb->data + nh_off;
+					if(skb->data + nh_off + sizeof(struct iphdr) + 4 > skb->data_end){
+						return 0;
+					}
+					else{
+					pkt->ip = iph->saddr;
+					
+					if(iph->protocol == 1){
+						// icmp
+						pkt->prot = 1;
+					}
+					if(iph->protocol == 6){
+						// tcp
+						pkt->prot = 6;
+					}
+					if(iph->protocol == 17){
+						// udp
+						pkt->prot = 17;
+					}
+					bpf_ringbuf_submit(rb_data,0);
+					}
+				}
 
-			bpf_ringbuf_submit(e,0);
-		
+				// not ip packet
+				else{
+					return TC_ACT_OK;
+				}
+			}
 		}
 	}
     return TC_ACT_OK;
