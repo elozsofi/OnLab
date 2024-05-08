@@ -3,12 +3,13 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include "common.h"
 #include <arpa/inet.h>
-//#include "ringbuf-output.skel.h"
+#include "ringbuf-output.skel.h"
 
 // IPC shared memory
 #include <fcntl.h>
@@ -22,13 +23,6 @@
 #define SEM_EMPTY_NAME "/sem_empty"
 #define SEM_FULL_NAME "/sem_full"
 
-/* packet data*/
-struct packet {
-	int ip;
-	//char payload[65*1024]; /*maximum TCP packet size is 65535kB*/
-	int prot;
-};
-
 int counter = 1;
 
 void *shared_memory;
@@ -41,7 +35,6 @@ void init_shared_memory(){
     shared_memory = mmap(0, SHM_SIZE, PROT_WRITE, MAP_SHARED, fd, 0);
 
 	free_space = shared_memory;
-	//close(fd);
 
 	empty = sem_open(SEM_EMPTY_NAME, O_CREAT, 0666, 1);
 	full = sem_open(SEM_FULL_NAME, O_CREAT, 0666, 0);
@@ -81,11 +74,24 @@ static void sig_handler(int sig)
 
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
-	int value;
+	struct packet *e = data;
+
+	printf("%d\n%d\n", e->ip, e->prot);
+	
+	unsigned char* temp = e->payload;
+	size_t i = 0;
+	printf("%d ", counter++);
+	for(; i!=data_sz; ++temp){
+  	  printf("%02x", *temp);
+	  i++;
+	}
+	printf("\n\n");
+
+	/*int value;
 	sem_getvalue(full, &value);
 	if(sem_trywait(empty) == 0){
 		if((shared_memory+SHM_SIZE) - free_space >= data_sz){
-			memcpy(shared_memory, data, data_sz);
+			memcpy(shared_memory, e->payload, data_sz);
 			free_space += data_sz;
 			sem_post(empty);
 		}
@@ -101,20 +107,8 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 	}
 	else{
 		printf("Buffer is full\n");
-	}
+	}*/
 
-	const struct packet *e = data;
-
-	printf("%d\n%d\n\n", e->ip, e->prot);
-	
-	/*unsigned char* temp = data;
-	size_t i = 0;
-	printf("%d ", counter++);
-	for(; i!=data_sz; ++temp){
-  	  printf("%02x", *temp);
-	  i++;
-	}
-	printf("\n\n");*/
 	return 0;
 }
 
