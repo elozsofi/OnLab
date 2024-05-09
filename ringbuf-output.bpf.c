@@ -35,7 +35,7 @@ int capture_packets(struct __sk_buff *skb) {
 	}
 	else{
 		//struct packet *pkt = (struct packet*)rb_data;
-		int ret = bpf_skb_load_bytes(skb,0,rb_data,512);
+		int ret = bpf_skb_load_bytes(skb,0,&rb_data->payload,512);
 
 		if(ret < 0) { goto cleanup; }
 		else {
@@ -46,10 +46,6 @@ int capture_packets(struct __sk_buff *skb) {
 			if ( (rb_data->payload + nh_off + 4) > (rb_data->payload+512)) 
 				goto cleanup;
 
-			// invalid packet size
-			if((rb_data->payload + nh_off + sizeof(struct iphdr)) > (rb_data->payload+512)){
-				goto cleanup;
-			}
 			else{
 				// parse headers
 				eth = (struct ethhdr *)rb_data->payload;
