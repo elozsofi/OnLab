@@ -71,11 +71,19 @@ static void sig_handler(int sig)
 {
 	exiting = true;
 }
+int swapEndianness(int num) {
+    return ((num>>24)&0xff) | // shift első B
+           ((num<<8)&0xff0000) | // shift második B
+           ((num>>8)&0xff00) | // shift harmadik B
+           ((num<<24)&0xff000000); // shift negyedik B
+}
 
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
-	printf("handle event");
 	struct packet *e = data;
+	printf("handle event");
+
+	swapEndianness(e->ip);
 
 	printf("%d\n%d\n", e->ip, e->prot);
 	
