@@ -74,6 +74,7 @@ static void sig_handler(int sig)
 
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
+	printf("handle event");
 	struct packet *e = data;
 
 	printf("%d\n%d\n", e->ip, e->prot);
@@ -154,7 +155,8 @@ int main(int argc, char **argv)
 		}
 	}
 
-cleanup:
+/*cleanup:
 	ring_buffer__free(rb);
 	return err < 0 ? -err : 0;
+*/
 }
