@@ -168,7 +168,6 @@ int main(int argc, char **argv)
 
 	rb = ring_buffer__new(fd,handle_event,NULL,NULL);
 
-	printf("1 = ICMP\t6 = TCP\t17 = UDP\n");
 	printf("%s\n", "PACKET");
 	while(!exiting){
 		err = ring_buffer__poll(rb, 100);
