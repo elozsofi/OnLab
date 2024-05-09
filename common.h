@@ -5,9 +5,9 @@
 
 /* packet data*/
 struct packet {
-	int ip;
-	void* payload; 
-	int prot;
+	unsigned int ip;
+	unsigned char payload[512]; 
+	unsigned int prot;
 };
 
 struct trace_entry {
