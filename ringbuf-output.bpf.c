@@ -28,65 +28,55 @@ struct {
 SEC("ingress")
 int capture_packets(struct __sk_buff *skb) {
 
-	void* rb_data = bpf_ringbuf_reserve(&rb, sizeof(struct packet*), 0);
+	struct packet *rb_data = (struct packet*)bpf_ringbuf_reserve(&rb, sizeof(struct packet), 0);
 
 	if (!rb_data){
 		return TC_ACT_OK;
 	}
 	else{
-		
-		int ret = bpf_skb_load_bytes(skb,0,rb_data,sizeof(struct packet*));
+		//struct packet *pkt = (struct packet*)rb_data;
+		int ret = bpf_skb_load_bytes(skb,0,rb_data,512);
 
-		if(ret < 0) { bpf_ringbuf_discard(rb_data,0); }
+		if(ret < 0) { goto cleanup; }
 		else {
-			struct packet *pkt;
-			pkt->payload = skb->data;
-			pkt = (struct packet *)rb_data;
+			//memcpy(pkt->payload,rb_data,512);
 			struct ethhdr *eth;
-			int zero = 0;
 			__u64 nh_off = sizeof(struct ethhdr);
 
-			if ( (skb->data + nh_off + 4) > skb->data_end) 
-				return 0;
+			if ( (rb_data->payload + nh_off + 4) > (rb_data->payload+512)) 
+				goto cleanup;
 
 			// invalid packet size
-			if((skb->data + nh_off + sizeof(struct iphdr)) > skb->data_end){
-				return TC_ACT_OK;
+			if((rb_data->payload + nh_off + sizeof(struct iphdr)) > (rb_data->payload+512)){
+				goto cleanup;
 			}
 			else{
 				// parse headers
-				eth = (struct ethhdr *)skb->data;
+				eth = (struct ethhdr *)rb_data->payload;
 				__u16 h_proto = eth->h_proto;
-				if(h_proto == (ETH_P_IP)){
-					struct iphdr *iph = skb->data + nh_off;
-					if(skb->data + nh_off + sizeof(struct iphdr) + 4 > skb->data_end){
-						return 0;
-					}
-					else{
-					pkt->ip = iph->saddr;
-					
-					if(iph->protocol == 1){
-						// icmp
-						pkt->prot = 1;
-					}
-					if(iph->protocol == 6){
-						// tcp
-						pkt->prot = 6;
-					}
-					if(iph->protocol == 17){
-						// udp
-						pkt->prot = 17;
-					}
-					bpf_ringbuf_submit(rb_data,0);
-					}
-				}
 
-				// not ip packet
-				else{
-					return TC_ACT_OK;
+				if(h_proto == (ETH_P_IP)){
+					struct iphdr *iph = rb_data->payload + nh_off;
+					if(rb_data->payload + nh_off + sizeof(struct iphdr) + 4 > (rb_data->payload+512)){
+						goto cleanup;
+					}
+
+					else{
+						rb_data->ip = iph->saddr;
+						rb_data->prot = iph->protocol;
+						bpf_ringbuf_submit(rb_data,0);
+					}
 				}
+				// not ip packet
+				else{ goto cleanup; }
 			}
 		}
 	}
     return TC_ACT_OK;
+
+/* throw packet away and return tc_act_ok (0)*/
+cleanup:
+	bpf_ringbuf_discard(rb_data,0);
+	return TC_ACT_OK;
+
 }
