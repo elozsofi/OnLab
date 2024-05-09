@@ -71,6 +71,7 @@ static void sig_handler(int sig)
 {
 	exiting = true;
 }
+
 int swapEndianness(int num) {
     return ((num>>24)&0xff) | // shift első B
            ((num<<8)&0xff0000) | // shift második B
@@ -78,14 +79,32 @@ int swapEndianness(int num) {
            ((num<<24)&0xff000000); // shift negyedik B
 }
 
+void printIPAddress(unsigned int ip) {
+    printf("%u.%u.%u.%u\n", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
+}
+
+void printProtocol(int i){
+	switch(i){
+		case(1):
+			printf("ICMP\n");
+			break;
+		case(6):
+			printf("TCP\n");
+			break;
+		case(17):
+			printf("UDP\n");
+			break;
+	}
+}
+
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	struct packet *e = data;
-	printf("handle event");
 
 	swapEndianness(e->ip);
 
-	printf("%d\n%d\n", e->ip, e->prot);
+	printIPAddress(e->ip);
+	printProtocol(e->prot);
 	
 	unsigned char* temp = e->payload;
 	size_t i = 0;
@@ -149,6 +168,7 @@ int main(int argc, char **argv)
 
 	rb = ring_buffer__new(fd,handle_event,NULL,NULL);
 
+	printf("1 = ICMP\t6 = TCP\t17 = UDP\n");
 	printf("%s\n", "PACKET");
 	while(!exiting){
 		err = ring_buffer__poll(rb, 100);
