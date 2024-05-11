@@ -72,6 +72,8 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
+/* swap from BE to LE, needed for
+   ip address */
 int swapEndianness(int num) {
     return ((num>>24)&0xff) | // shift első B
            ((num<<8)&0xff0000) | // shift második B
@@ -85,47 +87,28 @@ void printIPAddress(unsigned int ip) {
     bytes[1] = (ip >> 8) & 0xFF;
     bytes[2] = (ip >> 16) & 0xFF;
     bytes[3] = (ip >> 24) & 0xFF;   
-    printf("%d.%d.%d.%d\n", bytes[3], bytes[2], bytes[1], bytes[0]);    
+    printf("%d.%d.%d.%d\t", bytes[3], bytes[2], bytes[1], bytes[0]);    
 }
 
 void printProtocol(int i){
-	switch(i){
-		case(1):
-			printf("ICMP\n");
-			break;
-		case(6):
-			printf("TCP\n");
-			break;
-		case(17):
-			printf("UDP\n");
-			break;
-	}
+	if ( i == 1 ) { printf("ICMP\n"); }
+	if ( i == 6 ) { printf("TCP\n"); }
+	if ( i == 17 ) { printf("UDP\n"); }
 }
 
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	struct packet *e = data;
-
 	swapEndianness(e->ip);
-
 	printIPAddress(e->ip);
 	printProtocol(e->prot);
-	
-	unsigned char* temp = e->payload;
-	size_t i = 0;
-	printf("%d ", counter++);
-	for(; i!=data_sz; ++temp){
-  	  printf("%02x", *temp);
-	  i++;
-	}
-	printf("\n\n");
 
-	/*int value;
+	int value;
 	sem_getvalue(full, &value);
 	if(sem_trywait(empty) == 0){
-		if((shared_memory+SHM_SIZE) - free_space >= data_sz){
-			memcpy(shared_memory, e->payload, data_sz);
-			free_space += data_sz;
+		if((shared_memory+SHM_SIZE) - free_space >= 512){
+			memcpy(shared_memory, e->payload, 512);
+			free_space += 512;
 			sem_post(empty);
 		}
 		else{
@@ -140,7 +123,7 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 	}
 	else{
 		printf("Buffer is full\n");
-	}*/
+	}
 
 	return 0;
 }
@@ -186,9 +169,4 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
-
-/*cleanup:
-	ring_buffer__free(rb);
-	return err < 0 ? -err : 0;
-*/
 }
