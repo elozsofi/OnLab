@@ -8,13 +8,15 @@
 
 #define MAX_FILE_NAME 256
 
-// IPC shared memory
+// IPC shared memory    
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <semaphore.h>
+#include <linux/time.h>
+#include <bits/time.h>
 #define SHM_NAME "/packet_shm"
 #define SHM_SIZE 4*1024*1024 // shared buffer size is 4MB
 #define SEM_EMPTY_NAME "/sem_empty"
@@ -23,9 +25,6 @@
 void *shared_memory;
 sem_t *empty, *full;
 
-static void compress_orDie(void* data, size_t dataSize, void** compressedData, size_t* compressedSize, const size_t maxBufferSize);
-size_t loadFile_orDie(const char* fileName, void* buffer, size_t bufferSize);
-
 typedef struct Packet{
     size_t before;
     size_t after;
@@ -33,20 +32,21 @@ typedef struct Packet{
     double compress_rate;
 }Packet;
 
+static void compress_orDie(void* data, size_t dataSize, void** compressedData, size_t* compressedSize, const size_t maxBufferSize);
+size_t loadFile_orDie(const char* fileName, void* buffer, size_t bufferSize);
+
 void init_shared_memory() {
     int fd = shm_open(SHM_NAME, O_RDONLY, 0666);
     shared_memory = mmap(0, SHM_SIZE, PROT_READ, MAP_SHARED, fd, 0);
-    
-    //close(fd);
-
-    empty = sem_open(SEM_EMPTY_NAME, 0);
-    full = sem_open(SEM_FULL_NAME, 0);
+	full = sem_open(SEM_FULL_NAME, O_CREAT, 0666, 0);
 }
 
 void compress_and_report() {
     int counter = 1;
     while(1){
+        printf("varakozas\n");
         sem_wait(full);
+        printf("ezaz\n");
 
         // timestamps for compression runtime
         struct timespec start, end;
@@ -54,36 +54,29 @@ void compress_and_report() {
         clock_gettime(CLOCK_MONOTONIC, &start);
         tsm1 = start.tv_sec * 1000000000L + start.tv_nsec;
 
+        // compressing buffer data
         void *compressedData = NULL;
         size_t compressedSize = 0;
         compress_orDie(shared_memory, SHM_SIZE, &compressedData, &compressedSize, SHM_SIZE);
 
-
+        // calculating runtime
         clock_gettime(CLOCK_MONOTONIC, &end);
         tsm2 = end.tv_sec * 1000000000L + end.tv_nsec;
         float deltaTime = (float)(tsm2-tsm1);
         deltaTime *= 0.000001;
 
-        float compressionRate = compressedSize/SHM_SIZE*100;
-        printf("%d Before: %zu\tAfter: %zu\tCompression rate: %f\tRuntime: %.2fms\n", counter++, SHM_SIZE, compressedSize, compressionRate, deltaTime);
+        float compSize = (float)compressedSize;
+        float maxSize = (float)SHM_SIZE;
+        float compressionRate = compSize/maxSize;
+        printf("%d Before: %d\tAfter: %zu\tCompression rate: %.2f%%\tRuntime: %.2fms\n", counter++, SHM_SIZE, compressedSize, compressionRate*100, deltaTime);
         
         free(compressedData);
-        sem_post(empty);
     }
 }
 
 // needed for ACL rule: ip address + rate limit (defined as num of packets / second)
-// num of packets as an unsigned long long
-// timestamp needed for timeout
-// clock_gettime() -> 64b unix timestamp
 void ACL(const int ip, unsigned long long rateLimit) {
-    struct timespec ts;
-    unsigned long long tsm64;
-
-    clock_gettime(CLOCK_REALTIME, &ts);
-    tsm64 = ts.tv_sec * 1000000000L + ts.tv_nsec;
-
-    printf("Timestamp : %llu\n", tsm64);
+    // TODO
 }
 
 // boundary is 8MB (defined in main)
@@ -105,10 +98,6 @@ static void compress_orDie(void* data, size_t dataSize, void** compressedData, s
 
 int main(int argc, const char** argv)
 {
-    // maximum input buffer size is 8MB
-    //const size_t maxBufferSize = 8 * 1024 * 1024;
-    //Packet* p = getInfoFromKernel(maxBufferSize);
-    
     init_shared_memory();
     compress_and_report();
     return 0;
