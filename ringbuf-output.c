@@ -75,10 +75,10 @@ static void sig_handler(int sig)
 /* swap from BE to LE, needed for
    ip address */
 int swapEndianness(int num) {
-    return ((num>>24)&0xff) |
-           ((num<<8)&0xff0000) | 
-           ((num>>8)&0xff00) | 
-           ((num<<24)&0xff000000); 
+    return ((num>>24)&0xff) | // shift első B
+           ((num<<8)&0xff0000) | // shift második B
+           ((num>>8)&0xff00) | // shift harmadik B
+           ((num<<24)&0xff000000); // shift negyedik B
 }
 
 void printIPAddress(unsigned int ip) {
@@ -105,8 +105,13 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 
 	int value;
 	sem_getvalue(full, &value);
+	int value2;
+	sem_getvalue(empty, &value2);
+	printf("full: %d\tempty: %d\n", value, value2);
 	if(sem_trywait(empty) == 0){
-		if((shared_memory+SHM_SIZE) - free_space >= 512){
+		size_t space_left = shared_memory + SHM_SIZE /* ptr to end of buffer*/ - free_space /* ptr to first free space*/;
+		printf("space left in buffer: %d\n", space_left);
+		if( space_left >= 512){
 			memcpy(shared_memory, e->payload, 512);
 			free_space += 512;
 			sem_post(empty);
@@ -124,7 +129,6 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 	else{
 		printf("Buffer is full\n");
 	}
-
 	return 0;
 }
 
@@ -156,7 +160,7 @@ int main(int argc, char **argv)
 
 	rb = ring_buffer__new(fd,handle_event,NULL,NULL);
 
-	printf("%s\n", "PACKET");
+	printf("%s\t%s\n", "SOURCE IP", "PROTOCOL");
 	while(!exiting){
 		err = ring_buffer__poll(rb, 100);
 		/* Ctrl-C will cause -EINTR */
