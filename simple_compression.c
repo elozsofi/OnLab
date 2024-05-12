@@ -6,8 +6,6 @@
 #include "common.h"    // Helper functions, CHECK(), and CHECK_ZSTD()
 #include <dirent.h>
 
-#define MAX_FILE_NAME 256
-
 // IPC shared memory    
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -16,7 +14,6 @@
 #include <sys/types.h>
 #include <semaphore.h>
 #include <linux/time.h>
-#include <bits/time.h>
 #define SHM_NAME "/packet_shm"
 #define SHM_SIZE 4*1024*1024 // shared buffer size is 4MB
 #define SEM_EMPTY_NAME "/sem_empty"
@@ -24,13 +21,6 @@
 
 void *shared_memory;
 sem_t *empty, *full;
-
-typedef struct Packet{
-    size_t before;
-    size_t after;
-    int ip;
-    double compress_rate;
-}Packet;
 
 static void compress_orDie(void* data, size_t dataSize, void** compressedData, size_t* compressedSize, const size_t maxBufferSize);
 size_t loadFile_orDie(const char* fileName, void* buffer, size_t bufferSize);
@@ -44,9 +34,7 @@ void init_shared_memory() {
 void compress_and_report() {
     int counter = 1;
     while(1){
-        printf("varakozas\n");
         sem_wait(full);
-        printf("ezaz\n");
 
         // timestamps for compression runtime
         struct timespec start, end;
@@ -74,13 +62,10 @@ void compress_and_report() {
     }
 }
 
-// needed for ACL rule: ip address + rate limit (defined as num of packets / second)
 void ACL(const int ip, unsigned long long rateLimit) {
     // TODO
 }
 
-// boundary is 8MB (defined in main)
-// errsys log if input data size is too big (using printf for now)
 static void compress_orDie(void* data, size_t dataSize, void** compressedData, size_t* compressedSize, const size_t maxBufferSize)
 {
     // check dataSize
