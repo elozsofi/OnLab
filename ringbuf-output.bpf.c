@@ -27,15 +27,14 @@ int capture_packets(struct __sk_buff *skb) {
 		return TC_ACT_OK;
 	}
 	else{
-		//struct packet *pkt = (struct packet*)rb_data;
 		int ret = bpf_skb_load_bytes(skb,0,&rb_data->payload,512);
 
 		if(ret < 0) { goto cleanup; }
 		else {
-			//memcpy(pkt->payload,rb_data,512);
 			struct ethhdr *eth;
 			__u64 nh_off = sizeof(struct ethhdr);
 
+			/* check packet size, only 512 MB is put into buffer */
 			if ( (rb_data->payload + nh_off + 4) > (rb_data->payload+512)) 
 				goto cleanup;
 
@@ -45,7 +44,10 @@ int capture_packets(struct __sk_buff *skb) {
 				__u16 h_proto = eth->h_proto;
 
 				if(h_proto == (0x0008)){
+					/* ip header follows eth header */
 					struct iphdr *iph = rb_data->payload + nh_off;
+
+					/* check buffer overflow */
 					if(rb_data->payload + nh_off + sizeof(struct iphdr) + 4 > (rb_data->payload+512)){
 						goto cleanup;
 					}
