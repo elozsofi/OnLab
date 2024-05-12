@@ -87,7 +87,7 @@ void printIPAddress(unsigned int ip) {
     bytes[1] = (ip >> 8) & 0xFF;
     bytes[2] = (ip >> 16) & 0xFF;
     bytes[3] = (ip >> 24) & 0xFF;   
-    printf("%d.%d.%d.%d\t", bytes[3], bytes[2], bytes[1], bytes[0]);    
+    printf("%d.%d.%d.%d\t", bytes[0], bytes[1], bytes[2], bytes[3]);    
 }
 
 void printProtocol(int i){
