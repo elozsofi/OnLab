@@ -34,7 +34,7 @@ int capture_packets(struct __sk_buff *skb) {
 			struct ethhdr *eth;
 			__u64 nh_off = sizeof(struct ethhdr);
 
-			/* check packet size, only 512 MB is put into buffer */
+			/* check packet size, only 512 B is put into buffer */
 			if ( (rb_data->payload + nh_off + 4) > (rb_data->payload+512)) 
 				goto cleanup;
 
