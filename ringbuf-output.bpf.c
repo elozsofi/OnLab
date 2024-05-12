@@ -18,13 +18,6 @@ struct {
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 } rb SEC(".maps");
 
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(max_entries, 1);
-	__type(key,int);  // key is packet number
-	__type(value, struct packet); //value is packet
-} heap SEC(".maps");
-
 SEC("ingress")
 int capture_packets(struct __sk_buff *skb) {
 
@@ -51,7 +44,7 @@ int capture_packets(struct __sk_buff *skb) {
 				eth = (struct ethhdr *)rb_data->payload;
 				__u16 h_proto = eth->h_proto;
 
-				if(h_proto == (ETH_P_IP)){
+				if(h_proto == (0x0008)){
 					struct iphdr *iph = rb_data->payload + nh_off;
 					if(rb_data->payload + nh_off + sizeof(struct iphdr) + 4 > (rb_data->payload+512)){
 						goto cleanup;
@@ -74,5 +67,4 @@ int capture_packets(struct __sk_buff *skb) {
 cleanup:
 	bpf_ringbuf_discard(rb_data,0);
 	return TC_ACT_OK;
-
 }
