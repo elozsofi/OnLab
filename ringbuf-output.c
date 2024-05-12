@@ -75,10 +75,10 @@ static void sig_handler(int sig)
 /* swap from BE to LE, needed for
    ip address */
 int swapEndianness(int num) {
-    return ((num>>24)&0xff) | // shift első B
-           ((num<<8)&0xff0000) | // shift második B
-           ((num>>8)&0xff00) | // shift harmadik B
-           ((num<<24)&0xff000000); // shift negyedik B
+    return ((num>>24)&0xff) |
+           ((num<<8)&0xff0000) | 
+           ((num>>8)&0xff00) | 
+           ((num<<24)&0xff000000); 
 }
 
 void printIPAddress(unsigned int ip) {
