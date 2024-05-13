@@ -91,9 +91,9 @@ void printIPAddress(unsigned int ip) {
 }
 
 void printProtocol(int i){
-	if ( i == 1 ) { printf("ICMP\n"); }
-	if ( i == 6 ) { printf("TCP\n"); }
-	if ( i == 17 ) { printf("UDP\n"); }
+	if ( i == 1 ) { printf("ICMP\t"); }
+	if ( i == 6 ) { printf("TCP\t"); }
+	if ( i == 17 ) { printf("UDP\t"); }
 }
 
 int handle_event(void *ctx, void *data, size_t data_sz)
@@ -105,12 +105,9 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 
 	int value;
 	sem_getvalue(full, &value);
-	int value2;
-	sem_getvalue(empty, &value2);
-	printf("full: %d\tempty: %d\n", value, value2);
 	if(sem_trywait(empty) == 0){
 		size_t space_left = shared_memory + SHM_SIZE /* ptr to end of buffer*/ - free_space /* ptr to first free space*/;
-		printf("space left in buffer: %d\n", space_left);
+		printf("%d\n", space_left);
 		if( space_left >= 512){
 			memcpy(shared_memory, e->payload, 512);
 			free_space += 512;
@@ -160,7 +157,7 @@ int main(int argc, char **argv)
 
 	rb = ring_buffer__new(fd,handle_event,NULL,NULL);
 
-	printf("%s\t%s\n", "SOURCE IP", "PROTOCOL");
+	printf("%s\t%s\t%s\n", "SOURCE IP", "PROTOCOL", "SPACE IN BUFFER");
 	while(!exiting){
 		err = ring_buffer__poll(rb, 100);
 		/* Ctrl-C will cause -EINTR */
