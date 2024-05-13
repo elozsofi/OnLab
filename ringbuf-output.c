@@ -109,7 +109,7 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 		size_t space_left = shared_memory + SHM_SIZE /* ptr to end of buffer*/ - free_space /* ptr to first free space*/;
 		printf("%d\n", space_left);
 		if( space_left >= 512){
-			memcpy(shared_memory, e->payload, 512);
+			memcpy(free_space, e->payload, 512);
 			free_space += 512;
 			sem_post(empty);
 		}
