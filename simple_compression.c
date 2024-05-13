@@ -34,41 +34,39 @@ void init_shared_memory() {
 void compress_and_report() {
     int counter = 1;
     while(1){
-       if(sem_wait(full) == 0){
+        sem_wait(full);
 
-            // timestamps for compression runtime
-            struct timespec start, end;
-            unsigned long long tsm1, tsm2;
-            clock_gettime(CLOCK_MONOTONIC, &start);
-            tsm1 = start.tv_sec * 1000000000L + start.tv_nsec;
+        // timestamps for compression runtime
+        struct timespec start, end;
+        unsigned long long tsm1, tsm2;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        tsm1 = start.tv_sec * 1000000000L + start.tv_nsec;
 
-            // compressing buffer data
-            void *compressedData = NULL;
-            size_t compressedSize = 0;
-            compress_orDie(shared_memory, SHM_SIZE, &compressedData, &compressedSize, SHM_SIZE);
+        // compressing buffer data
+        void *compressedData = NULL;
+        size_t compressedSize = 0;
+        compress_orDie(shared_memory, SHM_SIZE, &compressedData, &compressedSize, SHM_SIZE);
 
-            // calculating runtime
-            clock_gettime(CLOCK_MONOTONIC, &end);
-            tsm2 = end.tv_sec * 1000000000L + end.tv_nsec;
-            float deltaTime = (float)(tsm2-tsm1);
-            deltaTime *= 0.000001;
+        // calculating runtime
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        tsm2 = end.tv_sec * 1000000000L + end.tv_nsec;
+        float deltaTime = (float)(tsm2-tsm1);
+        deltaTime *= 0.000001;
 
-            float compSize = (float)compressedSize;
-            float maxSize = (float)SHM_SIZE;
-            float compressionRate = compSize/maxSize;
+        float compSize = (float)compressedSize;
+        float maxSize = (float)SHM_SIZE;
+        float compressionRate = compSize/maxSize;
             
-            printf("%d\t%d\t%zu\t%.2f%%\t\t\t%.2fms", counter++, SHM_SIZE, compressedSize, compressionRate*100, deltaTime);
+        printf("%d\t%d\t%zu\t%.2f%%\t\t\t%.2fms", counter++, SHM_SIZE, compressedSize, compressionRate*100, deltaTime);
+        
+        ACL(compressionRate*100);
             
-            ACL(compressionRate*100);
-            
-            free(compressedData);
-        }
+        free(compressedData);
     }
- 
 }
 
 void ACL(float compRate) {
-    if(compRate > (float)0.02){
+    if(compRate > (float)95 || compRate < (float)50){
         printf("\tSUSPICIOUS\n");
     }
     else{
