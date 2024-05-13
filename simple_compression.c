@@ -13,7 +13,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <semaphore.h>
-#include <linux/time.h>
 #define SHM_NAME "/packet_shm"
 #define SHM_SIZE 4*1024*1024 // shared buffer size is 4MB
 #define SEM_EMPTY_NAME "/sem_empty"
@@ -24,6 +23,7 @@ sem_t *empty, *full;
 
 static void compress_orDie(void* data, size_t dataSize, void** compressedData, size_t* compressedSize, const size_t maxBufferSize);
 size_t loadFile_orDie(const char* fileName, void* buffer, size_t bufferSize);
+void ACL(float compRate);
 
 void init_shared_memory() {
     int fd = shm_open(SHM_NAME, O_RDONLY, 0666);
@@ -34,36 +34,46 @@ void init_shared_memory() {
 void compress_and_report() {
     int counter = 1;
     while(1){
-        sem_wait(full);
+       if(sem_wait(full) == 0){
 
-        // timestamps for compression runtime
-        struct timespec start, end;
-        unsigned long long tsm1, tsm2;
-        clock_gettime(CLOCK_MONOTONIC, &start);
-        tsm1 = start.tv_sec * 1000000000L + start.tv_nsec;
+            // timestamps for compression runtime
+            struct timespec start, end;
+            unsigned long long tsm1, tsm2;
+            clock_gettime(CLOCK_MONOTONIC, &start);
+            tsm1 = start.tv_sec * 1000000000L + start.tv_nsec;
 
-        // compressing buffer data
-        void *compressedData = NULL;
-        size_t compressedSize = 0;
-        compress_orDie(shared_memory, SHM_SIZE, &compressedData, &compressedSize, SHM_SIZE);
+            // compressing buffer data
+            void *compressedData = NULL;
+            size_t compressedSize = 0;
+            compress_orDie(shared_memory, SHM_SIZE, &compressedData, &compressedSize, SHM_SIZE);
 
-        // calculating runtime
-        clock_gettime(CLOCK_MONOTONIC, &end);
-        tsm2 = end.tv_sec * 1000000000L + end.tv_nsec;
-        float deltaTime = (float)(tsm2-tsm1);
-        deltaTime *= 0.000001;
+            // calculating runtime
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            tsm2 = end.tv_sec * 1000000000L + end.tv_nsec;
+            float deltaTime = (float)(tsm2-tsm1);
+            deltaTime *= 0.000001;
 
-        float compSize = (float)compressedSize;
-        float maxSize = (float)SHM_SIZE;
-        float compressionRate = compSize/maxSize;
-        printf("%d Before: %d\tAfter: %zu\tCompression rate: %.2f%%\tRuntime: %.2fms\n", counter++, SHM_SIZE, compressedSize, compressionRate*100, deltaTime);
-        
-        free(compressedData);
+            float compSize = (float)compressedSize;
+            float maxSize = (float)SHM_SIZE;
+            float compressionRate = compSize/maxSize;
+            
+            printf("%d\t%d\t%zu\t%.2f%%\t\t\t%.2fms", counter++, SHM_SIZE, compressedSize, compressionRate*100, deltaTime);
+            
+            ACL(compressionRate*100);
+            
+            free(compressedData);
+        }
     }
+ 
 }
 
-void ACL(const int ip, unsigned long long rateLimit) {
-    // TODO
+void ACL(float compRate) {
+    if(compRate > (float)0.02){
+        printf("\tSUSPICIOUS\n");
+    }
+    else{
+        printf("\tORDINARY\n");
+    }
 }
 
 static void compress_orDie(void* data, size_t dataSize, void** compressedData, size_t* compressedSize, const size_t maxBufferSize)
@@ -84,6 +94,7 @@ static void compress_orDie(void* data, size_t dataSize, void** compressedData, s
 int main(int argc, const char** argv)
 {
     init_shared_memory();
+    printf("%s\t%s\t%s\t%s\t%s\t%s\n", "NUM", "BEFORE", "AFTER", "COMPRESSION RATE", "RUNTIME", "CLASS");
     compress_and_report();
     return 0;
 }
